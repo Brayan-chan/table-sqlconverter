@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Tablas a SQL</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
+    <script type="importmap">
+        {
+          "imports": {
+            "@google/generative-ai": "https://esm.run/@google/generative-ai"
+          }
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-200">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <h1 class="text-3xl font-bold text-center mb-8 text-indigo-600 dark:text-indigo-400">Conversor de Tablas a SQL</h1>
+        
+        <div id="apiKeySection" class="bg-gray-100 dark:bg-gray-800 rounded-lg p-6 shadow-md mb-8">
+            <div class="mb-4">
+                <label for="apiKey" class="block text-lg font-medium mb-2">Clave API de Google AI Studio:</label>
+                <div class="flex">
+                    <input type="password" id="apiKey" placeholder="Ingresa tu clave API de Gemini" 
+                        class="flex-grow px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-l-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-base" />
+                    <button id="toggleApiKey" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-700 rounded-r-md hover:bg-gray-300 dark:hover:bg-gray-500 transition duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    Obtén una clave API en <a href="https://aistudio.google.com/" target="_blank" class="text-indigo-600 dark:text-indigo-400 underline">Google AI Studio</a>
+                </p>
+            </div>
+            <button id="saveApiKey" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">
+                Guardar Clave API
+            </button>
+        </div>
+        
+        <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-6 shadow-md mb-8">
+            <div class="mb-6">
+                <label for="fileInput" class="block text-lg font-medium mb-2">Subir una imagen con una tabla:</label>
+                <input type="file" id="fileInput" accept="image/*" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer bg-white dark:bg-gray-700 text-base">
+            </div>
+            
+            <div id="imagePreview" class="image-container hidden mb-6"></div>
+            
+            <div class="mb-6">
+                <label for="tableName" class="block text-lg font-medium mb-2">Nombre de la Tabla SQL:</label>
+                <input type="text" id="tableName" placeholder="Ingresa el nombre de la tabla" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-base">
+            </div>
+            
+            <div class="mb-6">
+                <div class="flex items-center justify-between">
+                    <label for="customInstructions" class="block text-lg font-medium mb-2">Instrucciones personalizadas:</label>
+                    <button id="toggleInstructions" class="text-indigo-600 dark:text-indigo-400 hover:underline text-sm">
+                        Mostrar opciones avanzadas
+                    </button>
+                </div>
+                
+                <div id="customInstructionsContainer" class="custom-instructions">
+                    <textarea id="customInstructions" placeholder="Ejemplo: Solo generar sentencias INSERT, cambiar tipos de datos específicos, etc." 
+                        class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 h-24 text-base"></textarea>
+                    <p class="hint">
+                        Usa esto para personalizar el SQL generado. Por ejemplo: "Generar solo INSERTs a la tabla clientes", "Usar INT para columnas numéricas", "Cambiar el nombre de la columna X a Y", etc.
+                    </p>
+                </div>
+            </div>
+            
+            <button id="processButton" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-md transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                Procesar Imagen y Generar SQL
+            </button>
+        </div>
+        
+        <div id="loadingContainer" class="hidden text-center">
+            <div class="circle-loader">
+                <div class="circle">
+                    <div class="dot"></div>
+                    <div class="outline"></div>
+                </div>
+                <div class="circle">
+                    <div class="dot"></div>
+                    <div class="outline"></div>
+                </div>
+                <div class="circle">
+                    <div class="dot"></div>
+                    <div class="outline"></div>
+                </div>
+                <div class="circle">
+                    <div class="dot"></div>
+                    <div class="outline"></div>
+                </div>
+            </div>
+            <p class="text-lg">Procesando tu imagen con Gemini AI, por favor espera...</p>
+        </div>
+        
+        <div id="resultContainer" class="hidden bg-gray-100 dark:bg-gray-800 rounded-lg p-6 shadow-md">
+            <h2 class="text-2xl font-bold mb-4">SQL Generado</h2>
+            <div id="sqlOutput" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md"></div>
+            <div class="mt-6">
+                <label for="modifyInstructions" class="block text-lg font-medium mb-2">¿Necesitas modificar el SQL? Indica tus instrucciones:</label>
+                <textarea id="modifyInstructions" placeholder="Ejemplo: Cambiar los tipos de datos, reformatear el SQL, solo generar INSERTs..." 
+                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 h-24 text-base mb-4"></textarea>
+                <button id="regenerateButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 mb-4 rounded-md transition duration-200">
+                    Regenerar SQL con Instrucciones
+                </button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button id="copyButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">
+                    Copiar SQL
+                </button>
+                <button id="newImageButton" class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md transition duration-200">
+                    Procesar Nueva Imagen
+                </button>
+            </div>
+        </div>
+        
+        <div id="errorContainer" class="hidden bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded-lg p-6 shadow-md mt-6">
+            <h2 class="text-xl font-bold mb-2">Error</h2>
+            <p id="errorMessage"></p>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>

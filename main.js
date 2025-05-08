@@ -106,7 +106,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
         function initializeGemini(apiKey) {
             try {
                 const genAI = new GoogleGenerativeAI(apiKey);
-                geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+                // Cambia la inicialización del modelo si es necesario
+                geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
                 processButton.disabled = !fileInput.files.length;
             } catch (error) {
                 console.error("Error inicializando Gemini:", error);
@@ -163,83 +164,66 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
             await processImage(lastProcessedImage, instructions);
         });
         
-        // Process image with Gemini
+        
+        // Actualizar el método de generación de contenido en processImage
         async function processImage(file, modifyInstructions = null) {
             const tableName = tableNameInput.value.trim() || 'tabla_extraida';
             const customInstructions = modifyInstructions || customInstructionsInput.value.trim();
-            
+        
             if (!geminiModel) {
                 apiKeySection.classList.remove('hidden');
                 showError('Por favor ingresa una clave API de Gemini válida');
                 return;
             }
-            
-            // Store the last processed image for regeneration
+        
             lastProcessedImage = file;
-            
-            // Show loading
+        
             loadingContainer.classList.remove('hidden');
             resultContainer.classList.add('hidden');
             errorContainer.classList.add('hidden');
             processButton.disabled = true;
             if (regenerateButton) regenerateButton.disabled = true;
-            
+        
             try {
-                // Convert file to base64 for Gemini
                 const base64Image = await fileToGenerativePart(file);
-                
-                // Base prompt
+        
                 let prompt = `
                 Tengo una imagen de una tabla con datos. Por favor:
-
+        
                 1. Identifica todas las columnas en la tabla
                 2. Extrae todos los datos de las filas de la tabla
                 3. Determina los tipos de datos apropiados para cada columna (VARCHAR, INT, DECIMAL, DATE, etc.)
                 4. Genera código SQL que cree una tabla llamada "${tableName}" e inserte todos los datos
-
+        
                 Devuelve tu respuesta en este formato:
                 
                 \`\`\`sql
                 -- Tus declaraciones SQL CREATE TABLE e INSERT aquí
                 \`\`\`
-
+        
                 Asegúrate de que los nombres de las columnas sean compatibles con SQL (minúsculas, sin espacios, usa guiones bajos).
                 Considera los patrones de datos al determinar los tipos de datos.
                 Usa la sintaxis SQL adecuada para crear tablas e insertar datos.
                 `;
-                
-                // Add custom instructions if provided
+        
                 if (customInstructions) {
                     prompt += `\n\nInstrucciones adicionales: ${customInstructions}`;
                 }
-                
+        
+                // Genera contenido con el modelo actualizado
                 const result = await geminiModel.generateContent([prompt, base64Image]);
                 const response = await result.response;
-                const text = response.text();
-                
-                // Extract SQL from the response
-                try {
-                    // Look for SQL code blocks
-                    const sqlMatch = text.match(/```sql\s*([\s\S]*?)\s*```/);
-                    if (sqlMatch && sqlMatch[1]) {
-                        sqlOutput.textContent = sqlMatch[1].trim();
-                    } else {
-                        // If no SQL block, try to extract any code block
-                        const codeMatch = text.match(/```\s*([\s\S]*?)\s*```/);
-                        if (codeMatch && codeMatch[1]) {
-                            sqlOutput.textContent = codeMatch[1].trim();
-                        } else {
-                            // If no code blocks at all, use the raw text
-                            sqlOutput.textContent = text.trim();
-                        }
-                    }
-                    
-                    loadingContainer.classList.add('hidden');
-                    resultContainer.classList.remove('hidden');
-                } catch (error) {
-                    console.error("Error procesando respuesta de Gemini:", error);
-                    showError("Error al extraer SQL de la respuesta.");
+                const text = await response.text();
+        
+                const sqlMatch = text.match(/```sql\s*([\s\S]*?)\s*```/);
+                if (sqlMatch && sqlMatch[1]) {
+                    sqlOutput.textContent = sqlMatch[1].trim();
+                } else {
+                    sqlOutput.textContent = text.trim();
                 }
+        
+                loadingContainer.classList.add('hidden');
+                resultContainer.classList.remove('hidden');
             } catch (error) {
                 console.error("Error llamando a la API de Gemini:", error);
                 loadingContainer.classList.add('hidden');
